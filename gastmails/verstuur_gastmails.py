@@ -12,6 +12,9 @@ gviz-CSV-export, en verstuurt drie mails op de juiste momenten t.o.v. een boekin
 Draait via GitHub Actions (elk uur); het script doet zelf niets buiten het venster
 14:00-15:00 Amsterdamse tijd, dus DST wordt automatisch goed afgehandeld.
 
+Na elke geslaagde gastmail krijgt kim@thegreenlodge.nl zelf een korte interne
+notificatiemail (platte tekst) dat en aan wie de mail verstuurd is.
+
 Vereist env vars: STRATO_EMAIL, STRATO_WACHTWOORD
 """
 import csv
@@ -52,16 +55,19 @@ MAILS = {
         "template": HIER / "templates" / "mail1_welkom.html",
         "onderwerp": "Bijna zover: praktische info voor je verblijf bij The Green Lodge",
         "afzender_naam": "Kim & Niels - The Green Lodge",
+        "label": "Mail 1 (welkomstinformatie, 5 dagen voor aankomst)",
     },
     "mail2": {
         "template": HIER / "templates" / "mail2_hoebevalt.html",
         "onderwerp": "Hoe bevalt het bij The Green Lodge?",
         "afzender_naam": "Kim - The Green Lodge",
+        "label": "Mail 2 (hoe bevalt het, 1 dag na aankomst)",
     },
     "mail3": {
         "template": HIER / "templates" / "mail3_vertrek.html",
         "onderwerp": "Bedankt voor je verblijf bij The Green Lodge",
         "afzender_naam": "Kim & Niels - The Green Lodge",
+        "label": "Mail 3 (vertrekinstructies, dag voor uitchecken)",
     },
 }
 
@@ -176,6 +182,26 @@ def bouw_email(mailtype, boeking, wachtwoord_niet_nodig=None):
     return msg, gast_adres
 
 
+def bouw_notificatie(mailtype, boeking, gast_adres):
+    info = MAILS[mailtype]
+    naam = f"{boeking.get('Voornaam','')} {boeking.get('Achternaam','')}".strip()
+    checkin = boeking.get("Check-in datum", "")
+
+    tekst = (
+        f"{info['label']} is zojuist verstuurd.\n\n"
+        f"Gast: {naam}\n"
+        f"E-mailadres: {gast_adres}\n"
+        f"Check-in: {checkin}\n"
+        f"Onderwerp: {info['onderwerp']}\n"
+    )
+
+    msg = MIMEText(tekst, "plain", "utf-8")
+    msg["Subject"] = f"Gastmail verstuurd: {info['label']} - {naam}"
+    msg["From"] = f"Gastmails The Green Lodge <{AFZENDER_ADRES}>"
+    msg["To"] = AFZENDER_ADRES
+    return msg
+
+
 def verstuur(msg, gast_adres, email, wachtwoord):
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.strato.de", 465, context=context) as server:
@@ -226,6 +252,13 @@ def main():
             gewijzigd = True
         except Exception as e:
             print(f"  {mailtype} voor {naam} MISLUKT: {e}", file=sys.stderr)
+            continue
+
+        try:
+            notificatie = bouw_notificatie(mailtype, boeking, gast_adres)
+            verstuur(notificatie, AFZENDER_ADRES, email, wachtwoord)
+        except Exception as e:
+            print(f"  notificatie naar Kim voor {naam} mislukt: {e}", file=sys.stderr)
 
     if gewijzigd:
         bewaar_log(log)
