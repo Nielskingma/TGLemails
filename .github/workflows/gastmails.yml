@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: gastmails
+  cancel-in-progress: false
+
 jobs:
   verstuur:
     runs-on: ubuntu-latest
