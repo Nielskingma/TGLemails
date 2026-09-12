@@ -209,17 +209,40 @@ def verstuur(msg, gast_adres, email, wachtwoord):
         server.sendmail(email, [gast_adres], msg.as_string())
 
 
-def main():
-    nu_nl = datetime.now(ZoneInfo("Europe/Amsterdam"))
-    if nu_nl.hour != 14:
-        print(f"Geen verzenduur ({nu_nl.strftime('%H:%M')} Amsterdamse tijd), stop.")
-        return
+def stuur_testmails(test_adres, email, wachtwoord):
+    """Stuurt alle drie de mails (+ notificatie) naar test_adres, los van datum/uur/log."""
+    testboeking = {
+        "Voornaam": "Test",
+        "Achternaam": "Persoon",
+        "Check-in datum": "01-01-2030",
+    }
+    for mailtype in ("mail1", "mail2", "mail3"):
+        msg, _ = bouw_email(mailtype, {**testboeking, "E-mailadres gast": test_adres})
+        verstuur(msg, test_adres, email, wachtwoord)
+        print(f"  testmail {mailtype} verstuurd aan {test_adres}")
 
+        notificatie = bouw_notificatie(mailtype, testboeking, test_adres)
+        verstuur(notificatie, AFZENDER_ADRES, email, wachtwoord)
+        print(f"  testnotificatie {mailtype} verstuurd aan {AFZENDER_ADRES}")
+
+
+def main():
     email = os.environ.get("STRATO_EMAIL")
     wachtwoord = os.environ.get("STRATO_WACHTWOORD")
     if not email or not wachtwoord:
         print("STRATO_EMAIL of STRATO_WACHTWOORD ontbreekt, stop.", file=sys.stderr)
         sys.exit(1)
+
+    test_adres = os.environ.get("TEST_ADRES", "").strip()
+    if test_adres:
+        print(f"Testmodus: alle drie mails + notificaties naar {test_adres}")
+        stuur_testmails(test_adres, email, wachtwoord)
+        return
+
+    nu_nl = datetime.now(ZoneInfo("Europe/Amsterdam"))
+    if nu_nl.hour != 14:
+        print(f"Geen verzenduur ({nu_nl.strftime('%H:%M')} Amsterdamse tijd), stop.")
+        return
 
     vandaag = nu_nl.date()
     log = laad_log()
