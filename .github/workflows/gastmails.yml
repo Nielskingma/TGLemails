@@ -3,7 +3,12 @@ name: Gastenmails The Green Lodge
 on:
   schedule:
     - cron: "0 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test_adres:
+        description: "Testadres (optioneel) - laat leeg voor normale run"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -26,6 +31,7 @@ jobs:
         env:
           STRATO_EMAIL: ${{ secrets.STRATO_EMAIL }}
           STRATO_WACHTWOORD: ${{ secrets.STRATO_WACHTWOORD }}
+          TEST_ADRES: ${{ github.event.inputs.test_adres }}
         run: python3 gastmails/verstuur_gastmails.py
 
       - name: Bewaar verzendlog
