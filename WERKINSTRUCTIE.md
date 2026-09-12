@@ -83,6 +83,39 @@ dupliceert uit het voorgaande jaar, de jaartal-verwijzingen in rij 3 bijwerkt en
 boekingsdata leegt (formules blijven staan). Dit gebeurt vanzelf de eerste keer dat een
 boeking voor een nieuw jaar verwerkt wordt — je hoeft er niet meer aan te denken.
 
+## Gastenmails The Green Lodge (Natuurhuisje-boekingen)
+Losse automatisering, apart van bovenstaande scripts: drie e-mails naar de gast rond
+zijn verblijf, alleen voor boekingen met Boekingsite = Natuurhuisje (andere platforms
+geven geen bruikbaar gastadres).
+
+- **Repo**: github.com/Nielskingma/TGLemails (los van dit lokale project, wel dezelfde
+  boekhouding-tgl-map als basis gebruikt — dus dit hele project staat ook in die repo)
+- **Draait**: GitHub Actions, elk uur; het script (`gastmails/verstuur_gastmails.py`)
+  doet zelf niets buiten 14:00-15:00 Amsterdamse tijd (DST-veilig via zoneinfo)
+- **Data**: leest het bronbestand rechtstreeks en publiek via de CSV-export-URL (zelfde
+  aanpak als TGLtado, geen Google-login nodig). Gid per jaartabblad staat hardcoded in
+  `GID_PER_JAAR` in het script — **voeg de gid van een nieuw jaar toe zodra
+  `nieuw_boekjaar.py` dat tabblad heeft aangemaakt**, anders wordt dat jaar overgeslagen
+- **Nieuwe kolom in bronbestand**: "E-mailadres gast" (2025: kolom Z, 2026/2027: kolom
+  AA) — Natuurhuisje geeft geen API/gastadres via de iCal-sync, dus dit vul je zelf
+  handmatig in vanuit de Natuurhuisje-portal per boeking. Zonder adres wordt die mail
+  overgeslagen (met logregel), niets anders breekt
+- **Verzendmoment per mail**:
+  1. Welkomstinformatie — 5 dagen vóór check-in
+  2. "Hoe bevalt het" — 1 dag na check-in
+  3. Vertrekinstructies — de dag vóór uitchecken
+- **Verzenden**: SMTP via Strato (`smtp.strato.de:465`) als kim@thegreenlodge.nl.
+  Secrets in de GitHub-repo: `STRATO_EMAIL`, `STRATO_WACHTWOORD` (mailbox-wachtwoord,
+  zelfde als Strato-webmail-login)
+- **Voorkomt dubbel versturen**: `gastmails/verzonden_log.json`, bijgehouden per
+  boeking+mailtype, wordt door de GitHub Action zelf teruggecommit na een succesvolle run
+- **Logo**: `gastmails/logo.png`, wordt inline (CID) meegestuurd, niet extern gehost
+- **Templates**: `gastmails/templates/mail1_welkom.html`, `mail2_hoebevalt.html`,
+  `mail3_vertrek.html` — platte HTML met inline styles (e-mailclient-vriendelijk),
+  `{{voornaam}}` als enige wisselend veld
+- Werkend getest 12 sep 2026: handmatige workflow_dispatch-run gaf correct
+  "Geen verzenduur (…) stop." buiten het 14u-venster
+
 ## Aanverwante automatisering (Google Apps Script, buiten dit Python-project)
 Naast dit Python-project draaien drie Apps Script-automatiseringen die ook op het
 bronbestand werken:
