@@ -18,9 +18,11 @@ notificatiemail (platte tekst) dat en aan wie de mail verstuurd is.
 Vereist env vars: STRATO_EMAIL, STRATO_WACHTWOORD
 """
 import csv
+import html as html_module
 import io
 import json
 import os
+import re
 import smtplib
 import ssl
 import sys
@@ -53,7 +55,7 @@ LOGO_PAD = HIER / "logo.png"
 MAILS = {
     "mail1": {
         "template": HIER / "templates" / "mail1_welkom.html",
-        "onderwerp": "Bijna zover: praktische info voor je verblijf bij The Green Lodge",
+        "onderwerp": "Je avontuur in de natuur begint bijna – welkom bij The Green Lodge!",
         "afzender_naam": "Kim & Niels - The Green Lodge",
         "label": "Mail 1 (welkomstinformatie, 5 dagen voor aankomst)",
     },
@@ -156,6 +158,24 @@ def bepaal_te_versturen(boekingen, vandaag):
     return te_versturen
 
 
+def platte_tekst_versie(html_inhoud):
+    """Ruwe platte-tekstversie van een mailtemplate, voor de alternative-part.
+
+    Een HTML-mail zonder text/plain-alternatief scoort hoger bij spamfilters.
+    """
+    tekst = html_inhoud
+    tekst = re.sub(r"(?is)<(script|style|head).*?</\1>", "", tekst)
+    tekst = re.sub(r"(?i)<br\s*/?>", "\n", tekst)
+    tekst = re.sub(r"(?i)</(p|tr|div|h[1-6])>", "\n\n", tekst)
+    tekst = re.sub(r"(?i)<li[^>]*>", "- ", tekst)
+    tekst = re.sub(r"(?i)</li>", "\n", tekst)
+    tekst = re.sub(r"<[^>]+>", "", tekst)
+    tekst = html_module.unescape(tekst)
+    tekst = re.sub(r"[ \t]+\n", "\n", tekst)
+    tekst = re.sub(r"\n{3,}", "\n\n", tekst)
+    return tekst.strip()
+
+
 def bouw_email(mailtype, boeking, wachtwoord_niet_nodig=None):
     info = MAILS[mailtype]
     html = info["template"].read_text(encoding="utf-8")
@@ -170,6 +190,7 @@ def bouw_email(mailtype, boeking, wachtwoord_niet_nodig=None):
     msg["To"] = gast_adres
 
     alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(platte_tekst_versie(html), "plain", "utf-8"))
     alt.attach(MIMEText(html, "html", "utf-8"))
     msg.attach(alt)
 
