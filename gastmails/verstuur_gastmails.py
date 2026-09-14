@@ -55,7 +55,7 @@ LOGO_PAD = HIER / "logo.png"
 MAILS = {
     "mail1": {
         "template": HIER / "templates" / "mail1_welkom.html",
-        "onderwerp": "Je avontuur in de natuur begint bijna – welkom bij The Green Lodge!",
+        "onderwerp": "Je avontuur in de natuur begint bijna – welkom bij The Green Lodge",
         "afzender_naam": "Kim & Niels - The Green Lodge",
         "label": "Mail 1 (welkomstinformatie, 5 dagen voor aankomst)",
     },
