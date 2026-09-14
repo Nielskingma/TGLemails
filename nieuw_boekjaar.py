@@ -8,7 +8,6 @@ boekingsgegevens (niet de formulekolommen) zodat het tabblad klaar is voor nieuw
 Wordt zowel los gebruikt (CLI) als geïmporteerd door btw_import.py, dat dit automatisch
 aanroept zodra het een boeking voor een nog niet bestaand jaar probeert te lezen.
 """
-import re
 import sys
 import warnings
 
@@ -20,8 +19,39 @@ BRON_SHEET_ID = "1IxShqefOAGqCuS68HSQSRANofcYnIIS87ylOM10qjrg"
 # Q, T, V, W, X zijn formulekolommen en blijven staan.
 INVUL_RANGES = ["A{s}:P{e}", "R{s}:S{e}", "U{s}:U{e}", "Y{s}:Z{e}"]
 
-# Cellen in rij 3 met een hardgecodeerd jaartal (label + 5 bezettingsgraad-formules).
-JAAR_CELLEN = ["H3", "J3", "L3", "N3", "P3", "R3"]
+# Vast rijbereik van de boekingsdata op elk jaartabblad (zelfde voor alle jaren).
+EERSTE_DATARIJ = 5
+LAATSTE_DATARIJ = 235
+
+
+def _bezettingsgraad_formules(jaar):
+    """Canonieke bezettingsgraad-formules voor rij 3, direct met het juiste jaartal.
+
+    Deze worden bij het aanmaken van een nieuw jaartabblad altijd opnieuw neergezet
+    (niet afgeleid van wat er in het bronjaar toevallig al stond) — anders erft elk
+    volgend jaar een fout in het bronjaar automatisch over (zoals 2027 had: verkeerd
+    rijbereik en verkeerde noemer bij de platform-percentages, ontstaan doordat dat
+    tabblad gedupliceerd was vóór de fix van de bezettingsgraad-formules).
+    Alleen geschikt voor volledige kalenderjaren (deelt door 365); 2025 was een
+    uitzondering (deeljaar) en is destijds eenmalig handmatig aangepast.
+    """
+    s, e = EERSTE_DATARIJ, LAATSTE_DATARIJ
+    a = f"A{s}:A{e}"
+    b = f"B{s}:B{e}"
+    q = f"Q{s}:Q{e}"
+    bezet = f'SUMPRODUCT(({a}<>"Eigen verblijf")*({a}<>"")*(YEAR({b})={jaar})*{q})'
+
+    def aandeel(voorwaarde):
+        return f'=TEXT(SUMPRODUCT({voorwaarde}*(YEAR({b})={jaar})*{q})/{bezet};"0%")'
+
+    return {
+        "H3": f"Bezettingsgraad {jaar}",
+        "J3": f'=TEXT({bezet}/365;"0%")',
+        "L3": aandeel(f'({a}="Airbnb")'),
+        "N3": aandeel(f'({a}="Natuurhuisje")'),
+        "P3": aandeel(f'({a}="Booking")'),
+        "R3": aandeel(f'(({a}="Direct")+({a}="Voyando"))'),
+    }
 
 
 def _stil(*_args, **_kwargs) -> None:
@@ -56,17 +86,12 @@ def zorg_voor_boekjaar(sh, jaar, log=None):
     )
     log(f"  Tabblad '{jaar}' aangemaakt op basis van '{bronjaar}'.")
 
-    # Jaartal-verwijzingen in rij 3 bijwerken (label + bezettingsgraad-formules)
-    huidige = nieuw.batch_get(JAAR_CELLEN, value_render_option="FORMULA")
-    updates = []
-    for cel, waarde in zip(JAAR_CELLEN, huidige):
-        tekst = waarde[0][0] if waarde and waarde[0] else ""
-        bijgewerkt = re.sub(re.escape(bronjaar), jaar, tekst)
-        if bijgewerkt != tekst:
-            updates.append({"range": cel, "values": [[bijgewerkt]]})
-    if updates:
-        nieuw.batch_update(updates, value_input_option="USER_ENTERED")
-        log(f"  Jaartal-verwijzingen in rij 3 bijgewerkt ({len(updates)} cellen).")
+    # Bezettingsgraad-formules in rij 3 altijd met de canonieke, correcte versie
+    # overschrijven (niet het jaartal vervangen in wat het bronjaar toevallig had staan).
+    formules = _bezettingsgraad_formules(jaar)
+    updates = [{"range": cel, "values": [[waarde]]} for cel, waarde in formules.items()]
+    nieuw.batch_update(updates, value_input_option="USER_ENTERED")
+    log(f"  Bezettingsgraad-formules in rij 3 neergezet voor {jaar} ({len(updates)} cellen).")
 
     # Laatst gebruikte rij bepalen (op basis van kolom A) om alleen echte boekingsdata te wissen
     kolom_a = bron.col_values(1)

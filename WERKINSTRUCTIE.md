@@ -200,6 +200,27 @@ verlopen, `auth_gspread.py` opnieuw gedraaid), op alle jaartabbladen (2025/2026/
 - BTW_TARIEVEN mapping: auto-invul bij bekende leveranciers (Odido 21%, Vitens 9%, etc.)
 - BTW TE BETALEN miste ROUNDDOWN → nu =ROUNDDOWN(...;0) bij aanmaak sheet
 
+## Open punt (sinds 14 sep 2026)
+2028-tabblad nog niet getest: `nieuw_boekjaar.py` is gefixt zodat de bezettingsgraad-
+formules (rij 3) bij een nieuw jaar altijd de canonieke, correcte versie krijgen i.p.v.
+het jaartal te vervangen in wat het bronjaar toevallig had staan (2027 had hierdoor een
+bug — zie hieronder). Zodra het 2028-tabblad automatisch wordt aangemaakt (eerste
+boeking voor 2028, via `zorg_voor_boekjaar()` in `btw_import.py`), even H3:R3 controleren
+op dat tabblad — moet er hetzelfde uitzien als 2027 nu (Airbnb/Natuurhuisje/Booking/Direct
+tellen op tot 100%).
+
+## Opgeloste bugs (14 sep 2026)
+- Bezettingsgraad-formules 2027 (rij 3, bronbestand) waren fout: verkeerd rijbereik
+  (`A8:A230` i.p.v. `A5:A235`, waardoor de eerste 3 boekingen van 2027 niet meetelden) en
+  verkeerde noemer bij de platform-percentages (deelden door 365 i.p.v. door totaal bezette
+  nachten, dus Airbnb/Natuurhuisje/Booking/Direct telden niet op tot 100%). Rechtstreeks in
+  de sheet gecorrigeerd naar hetzelfde patroon als 2026. 2025 en 2026 gecontroleerd: correct.
+- Grondoorzaak gefixt in `nieuw_boekjaar.py`: `zorg_voor_boekjaar()` verving voorheen alleen
+  het jaartal in de gedupliceerde rij-3-formules van het bronjaar — een fout in het bronjaar
+  (zoals hierboven bij 2027) erfde zo automatisch door naar elk volgend jaar. Nu wordt rij 3
+  altijd met de canonieke, geverifieerd-correcte formule herschreven (functie
+  `_bezettingsgraad_formules()`), ongeacht wat er in het bronjaar stond.
+
 ## Opgeloste bugs (augustus 2026)
 - `nieuw_boekjaar.py`: dupliceerde alleen waarden, niet opmaak → doorgestreepte/grijze
   "verstreken"-opmaak van het bronjaar bleef op lege rijen van het nieuwe jaar staan.
