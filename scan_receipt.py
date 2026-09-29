@@ -56,7 +56,7 @@ def scan_bonnetje(file_path: str) -> dict:
         [
             "claude", "-p", prompt,
             "--add-dir", str(path.parent),
-            "--allowedTools", "Read",
+            "--allowedTools", "Read,Bash",
             "--output-format", "json",
         ],
         capture_output=True,
@@ -142,6 +142,16 @@ def schrijf_naar_sheet(bonnetjes: list) -> None:
             ws = sh.worksheet(sheet_naam)
         kolom_a = ws.col_values(1)
 
+        # Databereik van dit tabblad kan afwijken van andere kwartalen (afhankelijk van het
+        # aantal UITGAAND-boekingen dat is meegeduplicaeerd) — dus niet blind op
+        # DATA_START_ROW vertrouwen, maar de "INKOMEND (KOSTEN"-header opzoeken.
+        inkomend_header_rij = None
+        for i, v in enumerate(kolom_a, 1):
+            if "INKOMEND (KOSTEN" in str(v).upper():
+                inkomend_header_rij = i
+                break
+        data_start_row = (inkomend_header_rij + 2) if inkomend_header_rij else DATA_START_ROW
+
         # Zoek de totaalrij
         totaal_rij = None
         for i, v in enumerate(kolom_a, 1):
@@ -149,14 +159,14 @@ def schrijf_naar_sheet(bonnetjes: list) -> None:
                 totaal_rij = i
                 break
 
-        # Zoek eerste lege rij vanaf DATA_START_ROW
-        volgende_rij = DATA_START_ROW
-        for i in range(DATA_START_ROW - 1, len(kolom_a)):
+        # Zoek eerste lege rij vanaf data_start_row
+        volgende_rij = data_start_row
+        for i in range(data_start_row - 1, len(kolom_a)):
             if not kolom_a[i].strip():
                 volgende_rij = i + 1
                 break
         else:
-            volgende_rij = max(len(kolom_a) + 1, DATA_START_ROW)
+            volgende_rij = max(len(kolom_a) + 1, data_start_row)
 
         rijen = [[
             b.get("datum") or "",
@@ -182,9 +192,9 @@ def schrijf_naar_sheet(bonnetjes: list) -> None:
         if totaal_rij:
             ws.update(
                 [[
-                    f"=SUM(D{DATA_START_ROW}:D{totaal_rij - 1})",
-                    f"=SUM(E{DATA_START_ROW}:E{totaal_rij - 1})",
-                    f"=SUM(F{DATA_START_ROW}:F{totaal_rij - 1})",
+                    f"=SUM(D{data_start_row}:D{totaal_rij - 1})",
+                    f"=SUM(E{data_start_row}:E{totaal_rij - 1})",
+                    f"=SUM(F{data_start_row}:F{totaal_rij - 1})",
                 ]],
                 f"D{totaal_rij}",
                 value_input_option="USER_ENTERED",
@@ -192,7 +202,7 @@ def schrijf_naar_sheet(bonnetjes: list) -> None:
 
         # Bedragkolommen opmaken als euro's
         einde_rij = totaal_rij or (volgende_rij + len(rijen) - 1)
-        ws.format(f"D{DATA_START_ROW}:F{einde_rij}", {"numberFormat": {"type": "CURRENCY", "pattern": "€#,##0.00"}})
+        ws.format(f"D{data_start_row}:F{einde_rij}", {"numberFormat": {"type": "CURRENCY", "pattern": "€#,##0.00"}})
 
 
 def kies_bestanden() -> list:

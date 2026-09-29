@@ -4,10 +4,21 @@ import sys
 import time
 import subprocess
 import json
+from datetime import date
 from pathlib import Path
 
 ONDERSTEUNDE_TYPES = {".jpg", ".jpeg", ".png", ".webp", ".pdf"}
 VERWERKT_LOG = Path.home() / ".config" / "bonnetjes_verwerkt.json"
+
+
+def standaard_inbox() -> Path:
+    """Kwartaalmap in de Financieel-structuur, bv. .../Financieel/2026/Q3."""
+    vandaag = date.today()
+    kwartaal = (vandaag.month - 1) // 3 + 1
+    return (
+        Path.home() / "pCloud Drive" / "01 Kim en Niels" / "The Green Lodge"
+        / "Financieel" / str(vandaag.year) / f"Q{kwartaal}"
+    )
 
 
 def laad_verwerkt() -> set:
@@ -23,7 +34,7 @@ def sla_verwerkt_op(verwerkt: set) -> None:
 def verwerk_bestand(pad: Path) -> None:
     print(f"Nieuw bestand gevonden: {pad.name} — scannen…")
     result = subprocess.run(
-        [sys.executable, str(Path.home() / "scan_receipt.py"), str(pad)],
+        [sys.executable, str(Path(__file__).parent / "scan_receipt.py"), str(pad)],
         capture_output=False,
     )
     if result.returncode != 0:
@@ -74,9 +85,9 @@ def main():
     if len(sys.argv) == 2:
         map_pad = Path(sys.argv[1])
     else:
-        map_pad = Path.home() / "pCloud Drive" / "The Green Lodge" / "Administratie" / "Bonnetjes inbox"
+        map_pad = standaard_inbox()
         map_pad.mkdir(parents=True, exist_ok=True)
-        print(f"Geen map opgegeven, standaard inbox: {map_pad}")
+        print(f"Geen map opgegeven, standaard inbox (huidig kwartaal): {map_pad}")
 
     if not map_pad.exists():
         print(f"Map bestaat niet: {map_pad}", file=sys.stderr)

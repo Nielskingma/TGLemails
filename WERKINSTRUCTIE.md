@@ -4,8 +4,12 @@
 BTW-administratie voor The Green Lodge: bonnetjes scannen, verwerken en per kwartaal bijhouden in Google Sheets.
 
 ## Huidige staat
-Q1 2026: compleet (BTW-saldo -€51,49, teruggave).
+Q1 2026: compleet, saldo geverifieerd tegen de ingediende PDF op 17 sep 2026: BTW-saldo
+-€48,89 (teruggave) — zie "Opgeloste bugs (17 sep 2026)" hieronder, oudere -€51,49 in deze
+instructie was onjuist.
 Q2 2026: volledig verwerkt. BTW TE BETALEN = €573,00. Aangifte indienen vóór 31 jul 2026.
+Q3 2026: 14 bonnetjes uit de map verwerkt (18 sep 2026), BTW TE BETALEN nu €2.246,72
+(nog niet ingediend, kwartaal loopt door t/m 30 sep).
 
 ## Architectuur
 bonnetjes (PDF/foto) → scan_receipt.py → Google Sheets (kwartaalblad)
@@ -49,8 +53,12 @@ cd ~/projects/boekhouding-tgl
 ```
 
 ## Bonnetjes inbox
-Automatisch verwerkt als je ze hier neerzet:
-`~/pCloud Drive/The Green Lodge/Administratie/Bonnetjes inbox`
+Automatisch verwerkt als je ze neerzet in de map van het **huidige kwartaal** in de
+Administratie-structuur, bv. voor Q3 2026:
+`~/pCloud Drive/01 Kim en Niels/The Green Lodge/Financieel/2026/Q3` (map heette tot 29 sep 2026 "Administratie")
+`watch_bonnetjes.py` berekent dit pad zelf (`standaard_inbox()`) op basis van de datum van
+vandaag, dus dit werkt vanzelf door voor Q4 2026, Q1 2027, enz. — je hoeft dit niet elk
+kwartaal opnieuw te laten aanpassen. Los pad meegeven kan nog steeds: `watch_bonnetjes.py <pad>`.
 
 ## Kwartaal afsluiten (checklist)
 1. Boekingen bijwerken: open btw_import.py → "Werk boekingen bij"
@@ -208,6 +216,62 @@ bug — zie hieronder). Zodra het 2028-tabblad automatisch wordt aangemaakt (eer
 boeking voor 2028, via `zorg_voor_boekjaar()` in `btw_import.py`), even H3:R3 controleren
 op dat tabblad — moet er hetzelfde uitzien als 2027 nu (Airbnb/Natuurhuisje/Booking/Direct
 tellen op tot 100%).
+
+## Opgeloste bugs (18 sep 2026, vervolg — bonnetjes-scan flakiness)
+- `scan_receipt.py` gebruikte een **hardcoded DATA_START_ROW=26** voor alle kwartaaltabbladen.
+  Q3 2026 heeft door minder UITGAAND-boekingen een andere layout (INKOMEND-data begint al op
+  rij 24 i.p.v. 26) — nu leest de code de echte positie van de "INKOMEND (KOSTEN"-header uit
+  het tabblad zelf i.p.v. een vaste rij aan te nemen (`data_start_row` in `schrijf_naar_sheet`).
+- De `claude -p ...`-subprocessaanroep in `scan_bonnetje()` gebruikte `--allowedTools Read`,
+  maar sommige PDF's (waarschijnlijk lastiger te parsen bestanden) hebben meer nodig — Claude
+  vraagt dan in platte tekst om toestemming, wat de JSON-parser laat crashen met "Overgeslagen:
+  Expecting value…". Nu `--allowedTools "Read,Bash"`. Dit loste het merendeel op, maar bleek
+  ook daarna nog **inherent flaky** (dezelfde aanroep op hetzelfde bestand slaagt de ene keer
+  wel, de andere keer niet) — bij hardnekkige mislukkingen is meerdere keren opnieuw proberen
+  de enige remedie, of het bestand zelf uitlezen i.p.v. via het script.
+- Bij het verwerken van de 15 bonnetjes uit de Q3-map bleek er één (**"Invoice 2282B2B" van
+  The Good Roll, 26-3-2026, €102,98/€21,63/€124,61**) al bestaand in Q1 2026 te staan (rij 78)
+  — een duplicaat, dus bewust NIET nogmaals in Q3 geboekt. Bestand staat nog wel fysiek in de
+  Q3-map; kan daar blijven liggen of verwijderd worden, telt niet mee.
+- Eén bonnetje (DHL-verzendlabel, factuur 21979592) bleek gedateerd 02-05-2026 (Q2, al
+  ingediend) — net als de eerdere Veneberg-bon meegeteld in Q3 i.p.v. een suppletie op Q2.
+
+## Opgeloste bugs (18 sep 2026)
+- `watch_bonnetjes.py` riep bij het verwerken van een gevonden bestand `~/scan_receipt.py`
+  aan (Path.home()) i.p.v. het script in de projectmap — dat bestand bestaat niet op die
+  plek, dus elk gedetecteerd bonnetje gaf stilzwijgend "Fout bij verwerken van ...". Nu
+  `Path(__file__).parent / "scan_receipt.py"`, werkt ongeacht vanuit welke map je het start.
+- De hardcoded standaard-inbox (`~/pCloud Drive/The Green Lodge/Administratie/Bonnetjes
+  inbox`) bestond niet meer sinds de pCloud-herstructurering (bestandsorganisatie-project,
+  23 aug 2026) — "The Green Lodge" zit sindsdien onder "01 Kim en Niels/". In de praktijk
+  gebruikt de bewoner sowieso geen aparte "Bonnetjes inbox"-map maar zet bonnetjes direct in
+  de kwartaalmap (`Administratie/{jaar}/Q{n}/`, Q1 heeft ook een "Verwerkt"-submap voor al
+  ingevoerde bonnetjes). `watch_bonnetjes.py` berekent de standaardmap nu dynamisch als de
+  kwartaalmap van vandaag (`standaard_inbox()`) — zie hierboven bij "Bonnetjes inbox".
+- **Let op, nog niet gedaan**: er lagen bij het maken van deze fix al 14 bonnetjes
+  ongesorteerd in `Administratie/2026/Q3/` (van vóór het starten van de watcher) — de
+  watcher reageert alleen op NIEUWE bestanden vanaf het moment dat je 'm start, dus die 14
+  moeten nog los verwerkt worden via `btw_import.py` → "Importeer bonnetjes" (bestandskiezer)
+  of `scan_receipt.py <bestand>` per stuk.
+
+## Opgeloste bugs (17 sep 2026)
+- Tabblad "Q1 2026" van de BTW-spreadsheet (1sXOnJpfsvgcAdGU4Bp6uzVUCFL7vXdn1JqNWFhntTjw)
+  gecontroleerd tegen de destijds opgeslagen aangifte-PDF (pCloud, `01 Kim en Niels/The
+  Green Lodge/Administratie/2026/Q1/The Green Lodge BTW - Q1 2026.pdf`) — PDF is bepalend
+  omdat die daadwerkelijk is ingediend. Drie problemen gevonden en hersteld:
+  - INKOMEND-sectie (rijen 26-81): zo goed als alle bedragcellen in kolom D/E/F stonden als
+    tekst ("€ 102,98" als string) i.p.v. als getal, waardoor de TOTAAL-SOM-formule ze niet
+    meetelde. Alle 56 rijen omgezet naar echte getallen met currency-opmaak; waarden zelf
+    kwamen (op één rij na) al overeen met de PDF.
+  - UITGAAND-rij Diek (Natuurhuisje) was ná het indienen aangepast (273,22/57,38/330,60
+    i.p.v. het ingediende 285,62/59,98/345,60) — teruggezet naar de PDF-waarden.
+  - Extra bonnetje "sleutel service, Veneberg" (02-02-2026, €8,26/€1,74/€10,00) stond wél in
+    de sheet maar niet in de ingediende PDF — kennelijk pas later toegevoegd. Uit Q1
+    gehaald en in plaats daarvan toegevoegd aan tabblad "Q3 2026" (rij 24) zodat de BTW
+    alsnog een keer wordt afgetrokken, in het eerstvolgende nog-niet-ingediende kwartaal.
+  - Bijkomend gefixt: SUM-formules voor TOTAAL INKOMEND (kolom D/F) liepen één rij te kort.
+  - Resultaat Q1 (nu identiek aan de PDF): BTW af te dragen €1.291,27, BTW te vorderen
+    €1.340,16, BTW TE BETALEN -€48,89.
 
 ## Opgeloste bugs (14 sep 2026)
 - Bezettingsgraad-formules 2027 (rij 3, bronbestand) waren fout: verkeerd rijbereik
